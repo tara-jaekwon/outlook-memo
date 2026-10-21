@@ -108,6 +108,18 @@
     background: var(--card);
     padding: 10px 16px 14px;
   }
+  .author { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+  .author input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 5px 8px;
+  }
   textarea {
     width: 100%;
     min-height: 72px;
@@ -152,6 +164,10 @@
   </main>
 
   <footer>
+    <div class="author">
+      <label for="authorInput">작성자</label>
+      <input id="authorInput" type="text" maxlength="20" placeholder="내 이름 (이 PC에 저장돼요)" />
+    </div>
     <label for="memoInput" class="sr-only" style="position:absolute;left:-9999px">전달사항 입력</label>
     <textarea id="memoInput" placeholder="이 메일로 작업할 사람에게 남길 내용을 적어주세요"></textarea>
     <div class="options">
@@ -170,6 +186,7 @@
   var PROP_KEY = "memos";          // 메일에 저장되는 사용자 지정 속성 이름
   var CATEGORY_NAME = "전달사항";   // 메일 목록에 붙일 범주 이름 (메일함에 같은 이름의 범주가 있어야 함)
   var MAX_SIZE = 2400;             // Outlook 사용자 지정 속성 용량 한도(약 2,500자)보다 약간 작게
+  var AUTHOR_KEY = "memoAuthorName"; // 이 PC(브라우저)에 저장할 작성자 이름 키
 
   var pendingDeleteId = null;
 
@@ -178,6 +195,12 @@
       setStatus("아웃룩에서 열어주세요.", true);
       return;
     }
+    var authorInput = document.getElementById("authorInput");
+    authorInput.value = loadAuthor();
+    authorInput.addEventListener("change", function () {
+      saveAuthor(authorInput.value.trim());
+      loadAndRender();
+    });
     document.getElementById("saveBtn").addEventListener("click", addMemo);
     document.getElementById("refreshBtn").addEventListener("click", loadAndRender);
     document.getElementById("memoInput").addEventListener("keydown", function (e) {
@@ -246,7 +269,7 @@
 
   function renderList(list) {
     var box = document.getElementById("list");
-    var me = currentUser().email.toLowerCase();
+    var me = currentUser();
     document.getElementById("count").textContent = list.length ? "전달사항 " + list.length + "건" : "";
 
     if (!list.length) {
@@ -277,8 +300,8 @@
       el.appendChild(head);
       el.appendChild(text);
 
-      // 본인이 쓴 전달사항만 삭제 가능
-      if ((m.email || "").toLowerCase() === me) {
+      // 본인이 쓴 전달사항만 삭제 가능 (같은 계정 + 같은 작성자 이름)
+      if ((m.email || "").toLowerCase() === me.email.toLowerCase() && me.name && m.by === me.name) {
         var actions = document.createElement("div");
         actions.className = "memo-actions";
         var del = document.createElement("button");
@@ -299,6 +322,10 @@
     var input = document.getElementById("memoInput");
     var text = input.value.trim();
     if (!text) { setStatus("전달사항 내용을 적어주세요.", true); input.focus(); return; }
+    var authorInput = document.getElementById("authorInput");
+    var authorName = authorInput.value.trim();
+    if (!authorName) { setStatus("작성자 이름을 먼저 적어주세요.", true); authorInput.focus(); return; }
+    saveAuthor(authorName);
 
     var btn = document.getElementById("saveBtn");
     btn.disabled = true;
@@ -372,7 +399,16 @@
   // ===== 도우미 =====
   function currentUser() {
     var p = Office.context.mailbox.userProfile || {};
-    return { name: p.displayName || "알 수 없음", email: p.emailAddress || "" };
+    var typed = document.getElementById("authorInput").value.trim();
+    return { name: typed || loadAuthor(), email: p.emailAddress || "" };
+  }
+
+  function loadAuthor() {
+    try { return localStorage.getItem(AUTHOR_KEY) || ""; } catch (e) { return ""; }
+  }
+
+  function saveAuthor(name) {
+    try { localStorage.setItem(AUTHOR_KEY, name); } catch (e) { /* 저장 불가 환경 */ }
   }
 
   function formatTime(iso) {
