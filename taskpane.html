@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>전달사항 메모</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  :root {
+    --bg: #F3F5F8;
+    --card: #FFFFFF;
+    --ink: #1E2A3A;
+    --muted: #677285;
+    --line: #DCE1E8;
+    --blue: #2B57C9;
+    --marker: #FFE45C;
+    --marker-soft: #FFF6C2;
+    --danger: #C23A3A;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1B1F26;
+      --card: #252B34;
+      --ink: #E8ECF2;
+      --muted: #9AA4B5;
+      --line: #36404D;
+      --blue: #7FA2FF;
+      --marker: #E8C93A;
+      --marker-soft: #3A3522;
+      --danger: #FF7B7B;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+  }
+  header h1 { font-size: 16px; font-weight: 700; margin: 0; }
+  #subject {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  #count { font-size: 12px; color: var(--muted); }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+  button:focus-visible, textarea:focus-visible, input:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--blue);
+    font-size: 12px;
+    padding: 2px 4px;
+  }
+  main { flex: 1; overflow-y: auto; padding: 12px 16px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 24px 4px; text-align: center; }
+  .memo {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--line);
+    border-radius: 4px 8px 8px 4px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .memo.important {
+    border-left-color: var(--marker);
+    background: linear-gradient(var(--marker-soft), var(--marker-soft)) padding-box;
+  }
+  .memo-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .memo-by { font-weight: 700; font-size: 13px; }
+  .memo-at { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .memo-text { margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; }
+  .memo-actions { text-align: right; margin-top: 4px; }
+  .del-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+  .del-btn.confirm { color: var(--danger); font-weight: 700; }
+  footer {
+    border-top: 1px solid var(--line);
+    background: var(--card);
+    padding: 10px 16px 14px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 72px;
+    resize: vertical;
+    font: inherit;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .options { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 12px; color: var(--muted); }
+  .options label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  #hint { font-size: 11px; color: var(--muted); }
+  #saveBtn {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    padding: 7px 16px;
+    font-weight: 700;
+  }
+  #saveBtn:disabled { opacity: 0.5; cursor: default; }
+  #status { font-size: 12px; margin-top: 6px; min-height: 18px; }
+  #status.error { color: var(--danger); }
+  #status.ok { color: var(--muted); }
+  @media (prefers-color-scheme: dark) { #saveBtn { color: #10182A; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>전달사항</h1>
+    <p id="subject">메일을 불러오는 중…</p>
+    <div class="toolbar">
+      <span id="count"></span>
+      <button class="link-btn" id="refreshBtn" type="button">새로고침</button>
+    </div>
+  </header>
+
+  <main id="list" aria-live="polite">
+    <p class="empty">불러오는 중…</p>
+  </main>
+
+  <footer>
+    <label for="memoInput" class="sr-only" style="position:absolute;left:-9999px">전달사항 입력</label>
+    <textarea id="memoInput" placeholder="이 메일로 작업할 사람에게 남길 내용을 적어주세요"></textarea>
+    <div class="options">
+      <label><input type="checkbox" id="importantChk" /> 중요 표시</label>
+      <label><input type="checkbox" id="categoryChk" checked /> 메일 목록에 ‘전달사항’ 범주 붙이기</label>
+    </div>
+    <div class="row">
+      <span id="hint">Ctrl+Enter로 저장</span>
+      <button id="saveBtn" type="button">전달사항 저장</button>
+    </div>
+    <div id="status"></div>
+  </footer>
+
+<script>
+  // ===== 설정 =====
+  var PROP_KEY = "memos";          // 메일에 저장되는 사용자 지정 속성 이름
+  var CATEGORY_NAME = "전달사항";   // 메일 목록에 붙일 범주 이름 (메일함에 같은 이름의 범주가 있어야 함)
+  var MAX_SIZE = 2400;             // Outlook 사용자 지정 속성 용량 한도(약 2,500자)보다 약간 작게
+
+  var pendingDeleteId = null;
+
+  Office.onReady(function (info) {
+    if (info.host !== Office.HostType.Outlook) {
+      setStatus("아웃룩에서 열어주세요.", true);
+      return;
+    }
+    document.getElementById("saveBtn").addEventListener("click", addMemo);
+    document.getElementById("refreshBtn").addEventListener("click", loadAndRender);
+    document.getElementById("memoInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addMemo(); }
+    });
+    // 작업창을 고정해 둔 상태에서 다른 메일을 선택하면 다시 불러오기
+    try {
+      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () {
+        pendingDeleteId = null;
+        loadAndRender();
+      });
+    } catch (e) { /* 고정 기능을 지원하지 않는 환경 */ }
+    loadAndRender();
+  });
+
+  // ===== 저장소 (메일 자체에 저장) =====
+  function loadProps(callback) {
+    var item = Office.context.mailbox.item;
+    if (!item) { callback(new Error("선택된 메일이 없어요.")); return; }
+    item.loadCustomPropertiesAsync(function (result) {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        callback(new Error("전달사항을 불러오지 못했어요: " + result.error.message));
+        return;
+      }
+      callback(null, result.value);
+    });
+  }
+
+  function readMemos(props) {
+    try {
+      var raw = props.get(PROP_KEY);
+      var list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writeMemos(props, list, callback) {
+    var json = JSON.stringify(list);
+    if (json.length > MAX_SIZE) {
+      callback(new Error("이 메일에 남길 수 있는 전달사항 용량을 넘었어요. 오래된 전달사항을 지우거나 짧게 써주세요."));
+      return;
+    }
+    if (list.length === 0) props.remove(PROP_KEY);
+    else props.set(PROP_KEY, json);
+    props.saveAsync(function (result) {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        callback(new Error("저장하지 못했어요: " + result.error.message));
+        return;
+      }
+      callback(null);
+    });
+  }
+
+  // ===== 화면 =====
+  function loadAndRender() {
+    var item = Office.context.mailbox.item;
+    document.getElementById("subject").textContent = item && item.subject ? item.subject : "선택된 메일이 없어요";
+    loadProps(function (err, props) {
+      if (err) { renderList([]); setStatus(err.message, true); return; }
+      renderList(readMemos(props));
+      setStatus("");
+    });
+  }
+
+  function renderList(list) {
+    var box = document.getElementById("list");
+    var me = currentUser().email.toLowerCase();
+    document.getElementById("count").textContent = list.length ? "전달사항 " + list.length + "건" : "";
+
+    if (!list.length) {
+      box.innerHTML = '<p class="empty">아직 남긴 전달사항이 없어요.<br>아래에 첫 전달사항을 적어주세요.</p>';
+      return;
+    }
+
+    box.innerHTML = "";
+    list.forEach(function (m) {
+      var el = document.createElement("article");
+      el.className = "memo" + (m.important ? " important" : "");
+
+      var head = document.createElement("div");
+      head.className = "memo-head";
+      var by = document.createElement("span");
+      by.className = "memo-by";
+      by.textContent = m.by || "알 수 없음";
+      var at = document.createElement("span");
+      at.className = "memo-at";
+      at.textContent = formatTime(m.at);
+      head.appendChild(by);
+      head.appendChild(at);
+
+      var text = document.createElement("p");
+      text.className = "memo-text";
+      text.textContent = m.text;
+
+      el.appendChild(head);
+      el.appendChild(text);
+
+      // 본인이 쓴 전달사항만 삭제 가능
+      if ((m.email || "").toLowerCase() === me) {
+        var actions = document.createElement("div");
+        actions.className = "memo-actions";
+        var del = document.createElement("button");
+        del.type = "button";
+        del.className = "del-btn" + (pendingDeleteId === m.id ? " confirm" : "");
+        del.textContent = pendingDeleteId === m.id ? "한 번 더 누르면 삭제" : "삭제";
+        del.addEventListener("click", function () { onDelete(m.id); });
+        actions.appendChild(del);
+        el.appendChild(actions);
+      }
+      box.appendChild(el);
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ===== 동작 =====
+  function addMemo() {
+    var input = document.getElementById("memoInput");
+    var text = input.value.trim();
+    if (!text) { setStatus("전달사항 내용을 적어주세요.", true); input.focus(); return; }
+
+    var btn = document.getElementById("saveBtn");
+    btn.disabled = true;
+    setStatus("저장하는 중…");
+
+    // 다른 사람이 그사이 남긴 전달사항을 덮어쓰지 않도록 최신 상태를 다시 읽고 추가
+    loadProps(function (err, props) {
+      if (err) { btn.disabled = false; setStatus(err.message, true); return; }
+      var list = readMemos(props);
+      var user = currentUser();
+      list.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        by: user.name,
+        email: user.email,
+        at: new Date().toISOString(),
+        text: text,
+        important: document.getElementById("importantChk").checked
+      });
+      writeMemos(props, list, function (err2) {
+        btn.disabled = false;
+        if (err2) { setStatus(err2.message, true); return; }
+        input.value = "";
+        document.getElementById("importantChk").checked = false;
+        renderList(list);
+        setStatus("저장했어요.");
+        if (document.getElementById("categoryChk").checked) addCategory();
+      });
+    });
+  }
+
+  function onDelete(id) {
+    if (pendingDeleteId !== id) {
+      pendingDeleteId = id;
+      loadAndRender();
+      return;
+    }
+    pendingDeleteId = null;
+    setStatus("삭제하는 중…");
+    loadProps(function (err, props) {
+      if (err) { setStatus(err.message, true); return; }
+      var list = readMemos(props).filter(function (m) { return m.id !== id; });
+      writeMemos(props, list, function (err2) {
+        if (err2) { setStatus(err2.message, true); return; }
+        renderList(list);
+        setStatus("삭제했어요.");
+        if (list.length === 0) removeCategory();
+      });
+    });
+  }
+
+  // ===== 범주 (메일 목록에서 전달사항이 있는 메일을 알아볼 수 있게) =====
+  function categoriesSupported() {
+    return Office.context.requirements.isSetSupported("Mailbox", "1.8") &&
+           Office.context.mailbox.item && Office.context.mailbox.item.categories;
+  }
+
+  function addCategory() {
+    if (!categoriesSupported()) return;
+    Office.context.mailbox.item.categories.addAsync([CATEGORY_NAME], function (r) {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) {
+        setStatus("저장했어요. 다만 ‘" + CATEGORY_NAME + "’ 범주를 붙이지 못했어요. 메일함에 같은 이름의 범주를 먼저 만들어 주세요.", true);
+      }
+    });
+  }
+
+  function removeCategory() {
+    if (!categoriesSupported()) return;
+    Office.context.mailbox.item.categories.removeAsync([CATEGORY_NAME], function () {});
+  }
+
+  // ===== 도우미 =====
+  function currentUser() {
+    var p = Office.context.mailbox.userProfile || {};
+    return { name: p.displayName || "알 수 없음", email: p.emailAddress || "" };
+  }
+
+  function formatTime(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    return (d.getMonth() + 1) + "/" + d.getDate() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  function setStatus(msg, isError) {
+    var s = document.getElementById("status");
+    s.textContent = msg || "";
+    s.className = msg ? (isError ? "error" : "ok") : "";
+  }
+</script>
+</body>
+</html>
